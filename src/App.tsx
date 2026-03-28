@@ -107,6 +107,7 @@ const COLOR_THEMES = [
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
+  const [loginMode, setLoginMode] = useState<'authenticated' | 'guest' | 'private' | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [colorTheme, setColorTheme] = useState('lavender');
@@ -198,6 +199,9 @@ export default function App() {
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        setLoginMode('authenticated');
+      }
       setIsAuthReady(true);
     });
 
@@ -229,8 +233,14 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    if (loginMode === 'guest' || loginMode === 'private') {
+      setLoginMode(null);
+      toast.success('Exited mode.');
+      return;
+    }
     try {
       await signOut(auth);
+      setLoginMode(null);
       toast.success('Logged out successfully.');
     } catch (error) {
       console.error(error);
@@ -239,8 +249,8 @@ export default function App() {
 
   const handleGenerate = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!user) {
-      toast.error('Please log in to use the tools.');
+    if (!user && loginMode !== 'guest' && loginMode !== 'private') {
+      toast.error('Please log in or continue as guest to use the tools.');
       return;
     }
 
@@ -321,16 +331,31 @@ export default function App() {
       setIsEditingOutput(false);
 
       // Save to Firestore
-      try {
-        await addDoc(collection(db, 'generations'), {
-          userId: user.uid,
-          toolName: tool.name,
-          promptData: JSON.stringify({ ...inputData, customPlatform, customTone, customLength }),
-          output: result,
-          createdAt: serverTimestamp()
-        });
-      } catch (dbError) {
-        console.error("Failed to save history:", dbError);
+      if (user && loginMode === 'authenticated') {
+        try {
+          await addDoc(collection(db, 'generations'), {
+            userId: user.uid,
+            toolName: tool.name,
+            promptData: JSON.stringify({ ...inputData, customPlatform, customTone, customLength }),
+            output: result,
+            createdAt: serverTimestamp()
+          });
+        } catch (dbError) {
+          console.error("Failed to save history:", dbError);
+        }
+      } else if (loginMode === 'guest') {
+        try {
+          const history = JSON.parse(localStorage.getItem('guest_history') || '[]');
+          history.push({
+            toolName: tool.name,
+            promptData: JSON.stringify({ ...inputData, customPlatform, customTone, customLength }),
+            output: result,
+            createdAt: new Date().toISOString()
+          });
+          localStorage.setItem('guest_history', JSON.stringify(history));
+        } catch (e) {
+          console.error("Failed to save guest history locally", e);
+        }
       }
 
       setTimeout(() => {
@@ -466,13 +491,26 @@ export default function App() {
               <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-muted transition-colors" title="Toggle Dark Mode">
                 {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
               </button>
-              {user ? (
+              {user || loginMode === 'guest' || loginMode === 'private' ? (
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2 bg-muted/50 pl-2 pr-4 py-1.5 rounded-full border border-border/50">
-                    <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} alt="User" className="w-7 h-7 rounded-full border border-border" referrerPolicy="no-referrer" />
-                    <span className="text-sm font-medium hidden lg:block">{user.displayName || user.email}</span>
+                    {user ? (
+                      <>
+                        <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} alt="User" className="w-7 h-7 rounded-full border border-border" referrerPolicy="no-referrer" />
+                        <span className="text-sm font-medium hidden lg:block">{user.displayName || user.email}</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                          {loginMode === 'private' ? <ShieldAlert size={14} /> : <UserCircle size={14} />}
+                        </div>
+                        <span className="text-sm font-medium hidden lg:block">
+                          {loginMode === 'private' ? 'Private Mode' : 'Guest'}
+                        </span>
+                      </>
+                    )}
                   </div>
-                  <button onClick={handleLogout} className="p-2 text-muted-foreground hover:text-foreground transition-colors" title="Logout">
+                  <button onClick={handleLogout} className="p-2 text-muted-foreground hover:text-foreground transition-colors" title={user ? "Logout" : "Exit Mode"}>
                     <LogOut size={20} />
                   </button>
                 </div>
@@ -521,17 +559,31 @@ export default function App() {
               ))}
             </div>
             
-            {user ? (
+            {user || loginMode === 'guest' || loginMode === 'private' ? (
               <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border/50">
-                  <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} alt="User" className="w-12 h-12 rounded-full shadow-sm" referrerPolicy="no-referrer" />
-                  <div className="flex flex-col">
-                    <span className="font-medium">{user.displayName}</span>
-                    <span className="text-xs text-muted-foreground">{user.email}</span>
-                  </div>
+                  {user ? (
+                    <>
+                      <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} alt="User" className="w-12 h-12 rounded-full shadow-sm" referrerPolicy="no-referrer" />
+                      <div className="flex flex-col">
+                        <span className="font-medium">{user.displayName}</span>
+                        <span className="text-xs text-muted-foreground">{user.email}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                        {loginMode === 'private' ? <ShieldAlert size={24} /> : <UserCircle size={24} />}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{loginMode === 'private' ? 'Private Mode' : 'Guest'}</span>
+                        <span className="text-xs text-muted-foreground">Not saved to cloud</span>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <button onClick={handleLogout} className="w-full py-3 text-center text-red-500 font-medium flex items-center justify-center gap-2 rounded-xl hover:bg-red-500/10 transition-colors">
-                  <LogOut size={18} /> Logout
+                  <LogOut size={18} /> {user ? 'Logout' : 'Exit Mode'}
                 </button>
               </div>
             ) : (
@@ -651,7 +703,7 @@ export default function App() {
 
         {/* Main Content Area */}
         <div className="flex-1 max-w-3xl w-full">
-          {!user ? (
+          {!user && loginMode !== 'guest' && loginMode !== 'private' ? (
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -664,14 +716,34 @@ export default function App() {
               <p className="text-muted-foreground mb-10 max-w-md text-lg">
                 Your advanced AI Script Writer Platform. Generate high-quality, human-like scripts for any platform instantly.
               </p>
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-md">
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleLogin} 
+                  className="glass-button flex-1 py-4 rounded-full font-medium text-base flex items-center justify-center gap-2 w-full"
+                >
+                  <UserCircle size={20} />
+                  Sign In
+                </motion.button>
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => { setLoginMode('guest'); toast.success('Continuing as Guest'); }} 
+                  className="bg-muted/50 hover:bg-muted border border-border/50 flex-1 py-4 rounded-full font-medium text-base flex items-center justify-center gap-2 w-full transition-colors"
+                >
+                  <UserCircle size={20} />
+                  Guest
+                </motion.button>
+              </div>
               <motion.button 
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleLogin} 
-                className="glass-button px-8 py-4 rounded-full font-medium text-lg flex items-center gap-3"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => { setLoginMode('private'); toast.success('Private Mode enabled'); }} 
+                className="mt-6 text-sm text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors"
               >
-                <UserCircle size={24} />
-                Sign In to Start Creating
+                <ShieldAlert size={16} />
+                Use Private Mode (Incognito)
               </motion.button>
             </motion.div>
           ) : (
