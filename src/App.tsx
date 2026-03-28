@@ -13,12 +13,12 @@ import {
   UserCircle, Twitter, Megaphone, Sun, Moon, LogOut, 
   Menu, X, Copy, Download, RefreshCw, Check,
   Linkedin, Video, ShieldAlert, Mic, Newspaper, Loader2, Settings2, Palette,
-  Undo2, Redo2, ChevronDown, ChevronUp, SlidersHorizontal, LayoutGrid, Settings, Lock, Unlock, Key
+  Undo2, Redo2, ChevronDown, ChevronUp, SlidersHorizontal, LayoutGrid, Settings, Lock, Unlock, Key, Share2
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-import { auth, db, signInWithPopup, googleProvider, signOut, onAuthStateChanged, collection, addDoc, serverTimestamp } from './lib/firebase';
+import { auth, db, signInWithPopup, googleProvider, signOut, onAuthStateChanged, collection, addDoc, serverTimestamp, getDoc, doc } from './lib/firebase';
 import { generateScript } from './lib/gemini';
 
 function cn(...inputs: ClassValue[]) {
@@ -203,6 +203,7 @@ export default function App() {
   const [apiPasswordInput, setApiPasswordInput] = useState('');
   const [tempApiKey, setTempApiKey] = useState('');
   const [tempApiPassword, setTempApiPassword] = useState('');
+  const [isSharing, setIsSharing] = useState(false);
 
   const outputRef = useRef<HTMLDivElement>(null);
 
@@ -210,6 +211,35 @@ export default function App() {
     const random = IDEA_SUGGESTIONS[Math.floor(Math.random() * IDEA_SUGGESTIONS.length)];
     updateInputData({...inputData, topic: random, text: random});
   };
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedId = urlParams.get('shared');
+    
+    if (sharedId) {
+      const fetchSharedScript = async () => {
+        try {
+          const docRef = doc(db, 'shared_scripts', sharedId);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setOutput(data.output);
+            setEditedOutput(data.output);
+            setActiveTool(data.toolName);
+            setLoginMode('guest'); // Allow them to view it
+            toast.success('Shared script loaded!');
+          } else {
+            toast.error('Shared script not found.');
+          }
+        } catch (error) {
+          console.error("Error fetching shared script:", error);
+          toast.error('Failed to load shared script.');
+        }
+      };
+      fetchSharedScript();
+    }
+  }, []);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
@@ -456,6 +486,30 @@ export default function App() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success('Downloaded successfully!');
+  };
+
+  const handleShare = async () => {
+    const textToShare = isEditingOutput ? editedOutput : output;
+    if (!textToShare) return;
+    
+    setIsSharing(true);
+    try {
+      const docRef = await addDoc(collection(db, 'shared_scripts'), {
+        userId: user?.uid || 'anonymous',
+        toolName: activeTool,
+        output: textToShare,
+        createdAt: serverTimestamp()
+      });
+      
+      const shareUrl = `${window.location.origin}${window.location.pathname}?shared=${docRef.id}`;
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success('Share link copied to clipboard!');
+    } catch (error) {
+      console.error("Error sharing script:", error);
+      toast.error('Failed to generate share link.');
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   // Keyboard shortcut
@@ -1225,6 +1279,9 @@ export default function App() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1 sm:gap-2">
+                        <button onClick={handleShare} disabled={isSharing} className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50" title="Share link">
+                          {isSharing ? <Loader2 size={18} className="animate-spin" /> : <Share2 size={18} />}
+                        </button>
                         <button onClick={handleCopy} className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground" title="Copy to clipboard">
                           {copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
                         </button>

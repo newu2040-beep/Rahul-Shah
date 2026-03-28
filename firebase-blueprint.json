@@ -25,6 +25,18 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "toolName", "promptData", "output", "createdAt"]
+    },
+    "SharedScript": {
+      "title": "SharedScript",
+      "description": "A publicly shared script",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "toolName": { "type": "string" },
+        "output": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "toolName", "output", "createdAt"]
     }
   },
   "firestore": {
@@ -35,6 +47,10 @@
     "generations/{generationId}": {
       "schema": { "$ref": "#/entities/Generation" },
       "description": "User generated content history"
+    },
+    "shared_scripts/{scriptId}": {
+      "schema": { "$ref": "#/entities/SharedScript" },
+      "description": "Publicly shared scripts"
     }
   }
 }

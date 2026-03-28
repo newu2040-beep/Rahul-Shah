@@ -85,6 +85,14 @@ service cloud.firestore {
              data.createdAt is timestamp;
     }
 
+    function isValidSharedScript(data) {
+      return hasOnlyAllowedFields(['userId', 'toolName', 'output', 'createdAt']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 128 &&
+             data.toolName is string && data.toolName.size() > 0 && data.toolName.size() < 100 &&
+             data.output is string && data.output.size() <= 50000 &&
+             data.createdAt is timestamp;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -110,6 +118,14 @@ service cloud.firestore {
                     isValidGeneration(request.resource.data);
       allow update: if false; // Generations are immutable history records
       allow delete: if isDocOwner();
+    }
+
+    match /shared_scripts/{scriptId} {
+      allow read: if true; // Anyone can read shared scripts
+      allow create: if hasRequiredFields(['userId', 'toolName', 'output', 'createdAt']) &&
+                    isValidSharedScript(request.resource.data);
+      allow update: if false; // Shared scripts are immutable
+      allow delete: if false; // Only admins or system can delete
     }
   }
 }
