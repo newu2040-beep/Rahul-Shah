@@ -111,7 +111,24 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [colorTheme, setColorTheme] = useState('lavender');
-  const [activeTool, setActiveTool] = useState(TOOLS[0].id);
+  // Custom Tools State
+  const [customTools, setCustomTools] = useState<any[]>(() => {
+    const saved = localStorage.getItem('customTools');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [isCustomToolModalOpen, setIsCustomToolModalOpen] = useState(false);
+  const [newCustomTool, setNewCustomTool] = useState({ name: '', description: '', systemInstruction: '' });
+
+  const ALL_TOOLS = [...TOOLS, ...customTools.map(t => ({ ...t, icon: Wand2 }))];
+  const ALL_CATEGORIES = [...TOOL_CATEGORIES];
+  if (customTools.length > 0) {
+    ALL_CATEGORIES.push({
+      name: 'Custom Tools',
+      tools: customTools.map(t => t.id)
+    });
+  }
+
+  const [activeTool, setActiveTool] = useState(ALL_TOOLS[0].id);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
 
@@ -295,7 +312,7 @@ export default function App() {
       return;
     }
 
-    const tool = TOOLS.find(t => t.id === activeTool);
+    const tool = ALL_TOOLS.find(t => t.id === activeTool);
     if (!tool) return;
 
     setIsGenerating(true);
@@ -305,65 +322,73 @@ export default function App() {
       let prompt = '';
       let systemInstruction = 'You are an expert, human-like AI copywriter and scriptwriter. Your writing must be 100% natural, emotional, engaging, and avoid robotic or repetitive patterns. Always provide unique, fresh content. Use formatting like bolding, bullet points, and paragraphs to make it readable.';
 
-      switch (activeTool) {
-        case 'script-generator':
-          const { topic, instructions } = inputData;
-          if (!topic) throw new Error('Topic is required.');
-          
-          const actualPlatform = inputData.platform === 'Custom' ? customPlatform : (inputData.platform || PLATFORMS[0]);
-          const actualTone = inputData.tone === 'Custom' ? customTone : (inputData.tone || TONES[0]);
-          const actualLength = inputData.length === 'Custom' ? customLength : (inputData.length || LENGTHS[2]);
-          const actualGenre = inputData.genre === 'Custom' ? customGenre : (inputData.genre || GENRES[0]);
+      if (tool.isCustom) {
+        const input = inputData.text || inputData.topic;
+        if (!input) throw new Error('Input is required.');
+        prompt = `Task: ${tool.name}. Input: "${input}".`;
+        systemInstruction = tool.systemInstruction;
+      } else {
+        switch (activeTool) {
+          case 'script-generator':
+            const { topic, instructions } = inputData;
+            if (!topic) throw new Error('Topic is required.');
+            
+            const actualPlatform = inputData.platform === 'Custom' ? customPlatform : (inputData.platform || PLATFORMS[0]);
+            const actualTone = inputData.tone === 'Custom' ? customTone : (inputData.tone || TONES[0]);
+            const actualLength = inputData.length === 'Custom' ? customLength : (inputData.length || LENGTHS[2]);
+            const actualGenre = inputData.genre === 'Custom' ? customGenre : (inputData.genre || GENRES[0]);
 
-          if (inputData.platform === 'Custom' && !customPlatform) throw new Error('Custom platform is required.');
-          if (inputData.tone === 'Custom' && !customTone) throw new Error('Custom tone is required.');
-          if (inputData.length === 'Custom' && !customLength) throw new Error('Custom length is required.');
-          if (inputData.genre === 'Custom' && !customGenre) throw new Error('Custom genre is required.');
+            if (inputData.platform === 'Custom' && !customPlatform) throw new Error('Custom platform is required.');
+            if (inputData.tone === 'Custom' && !customTone) throw new Error('Custom tone is required.');
+            if (inputData.length === 'Custom' && !customLength) throw new Error('Custom length is required.');
+            if (inputData.genre === 'Custom' && !customGenre) throw new Error('Custom genre is required.');
 
-          prompt = `Write a ${actualLength} script for ${actualPlatform} about "${topic}". Genre: ${actualGenre}. Tone: ${actualTone}. Additional instructions: ${instructions || 'None'}. Make it engaging with a strong hook, build-up, and CTA.`;
-          break;
-        case 'clean-paragraphs':
-          if (!inputData.text) throw new Error('Text is required.');
-          prompt = `Convert the following messy text into clean, readable paragraphs. Remove unnecessary words, filler, and headings. Make it simple, easy to copy, and ready to send. Do not add any introductory or concluding remarks. Just the clean text:\n\n${inputData.text}`;
-          break;
-        case 'b-roll-planner':
-          if (!inputData.text) throw new Error('Script text is required.');
-          prompt = `Read the following script and suggest highly engaging, visual B-roll shots for each section. Format it as a clean list or table:\n\n${inputData.text}`;
-          break;
-        case 'content-repurposer':
-          if (!inputData.text) throw new Error('Content is required.');
-          prompt = `Repurpose the following content into a highly engaging Twitter thread and a LinkedIn post. Keep the core message but adapt the format perfectly for each platform:\n\n${inputData.text}`;
-          break;
-        case 'yt-community':
-          if (!inputData.topic) throw new Error('Topic is required.');
-          prompt = `Write an engaging YouTube Community post about "${inputData.topic}". Make it interactive, ask a question, and include a poll idea with 3-4 options if relevant.`;
-          break;
-        case 'podcast-notes':
-          if (!inputData.text) throw new Error('Podcast transcript or summary is required.');
-          prompt = `Create professional podcast show notes from the following text. Include a catchy title, a brief summary, 3-5 key takeaways, and suggested timestamps:\n\n${inputData.text}`;
-          break;
-        case 'rewrite-humanizer':
-          if (!inputData.text) throw new Error('Text is required.');
-          prompt = `Rewrite the following text to sound completely human, natural, and engaging. Remove any robotic AI patterns, cliches (like "In today's fast-paced world"), and make it flow beautifully:\n\n${inputData.text}`;
-          break;
-        case 'hook-generator':
-          if (!inputData.topic) throw new Error('Topic is required.');
-          prompt = `Generate 7 highly engaging, viral opening hooks for a video/post about: "${inputData.topic}". Make them irresistible to scroll past. Include a mix of curiosity gaps, bold statements, and questions.`;
-          break;
-        case 'linkedin-post':
-          if (!inputData.topic) throw new Error('Topic is required.');
-          prompt = `Write a viral, engaging LinkedIn post about "${inputData.topic}". Use a strong hook, short readable paragraphs (broetry style but natural), and end with a question to drive comments.`;
-          break;
-        default:
-          const input = inputData.text || inputData.topic;
-          if (!input) throw new Error('Input is required.');
-          prompt = `Task: ${tool.name}. Input: "${input}". Generate high-quality, human-like output optimized for engagement.`;
+            prompt = `Write a ${actualLength} script for ${actualPlatform} about "${topic}". Genre: ${actualGenre}. Tone: ${actualTone}. Additional instructions: ${instructions || 'None'}. Make it engaging with a strong hook, build-up, and CTA.`;
+            break;
+          case 'clean-paragraphs':
+            if (!inputData.text) throw new Error('Text is required.');
+            prompt = `Convert the following messy text into clean, readable paragraphs. Remove unnecessary words, filler, and headings. Make it simple, easy to copy, and ready to send. Do not add any introductory or concluding remarks. Just the clean text:\n\n${inputData.text}`;
+            break;
+          case 'b-roll-planner':
+            if (!inputData.text) throw new Error('Script text is required.');
+            prompt = `Read the following script and suggest highly engaging, visual B-roll shots for each section. Format it as a clean list or table:\n\n${inputData.text}`;
+            break;
+          case 'content-repurposer':
+            if (!inputData.text) throw new Error('Content is required.');
+            prompt = `Repurpose the following content into a highly engaging Twitter thread and a LinkedIn post. Keep the core message but adapt the format perfectly for each platform:\n\n${inputData.text}`;
+            break;
+          case 'yt-community':
+            if (!inputData.topic) throw new Error('Topic is required.');
+            prompt = `Write an engaging YouTube Community post about "${inputData.topic}". Make it interactive, ask a question, and include a poll idea with 3-4 options if relevant.`;
+            break;
+          case 'podcast-notes':
+            if (!inputData.text) throw new Error('Podcast transcript or summary is required.');
+            prompt = `Create professional podcast show notes from the following text. Include a catchy title, a brief summary, 3-5 key takeaways, and suggested timestamps:\n\n${inputData.text}`;
+            break;
+          case 'rewrite-humanizer':
+            if (!inputData.text) throw new Error('Text is required.');
+            prompt = `Rewrite the following text to sound completely human, natural, and engaging. Remove any robotic AI patterns, cliches (like "In today's fast-paced world"), and make it flow beautifully:\n\n${inputData.text}`;
+            break;
+          case 'hook-generator':
+            if (!inputData.topic) throw new Error('Topic is required.');
+            prompt = `Generate 7 highly engaging, viral opening hooks for a video/post about: "${inputData.topic}". Make them irresistible to scroll past. Include a mix of curiosity gaps, bold statements, and questions.`;
+            break;
+          case 'linkedin-post':
+            if (!inputData.topic) throw new Error('Topic is required.');
+            prompt = `Write a viral, engaging LinkedIn post about "${inputData.topic}". Use a strong hook, short readable paragraphs (broetry style but natural), and end with a question to drive comments.`;
+            break;
+          default:
+            const input = inputData.text || inputData.topic;
+            if (!input) throw new Error('Input is required.');
+            prompt = `Task: ${tool.name}. Input: "${input}". Generate high-quality, human-like output optimized for engagement.`;
+        }
       }
 
       const result = await generateScript({
         prompt, 
         systemInstruction,
         creativityLevel: inputData.creativityLevel ?? 0.7,
+        humanLevel: inputData.humanLevel ?? 0.9,
         negativePrompt: inputData.negativePrompt ?? '',
         stylePreset: inputData.stylePreset ?? 'Natural',
         apiKey: savedApiKey || undefined
@@ -452,11 +477,11 @@ export default function App() {
     );
   }
 
-  const activeToolData = TOOLS.find(t => t.id === activeTool);
+  const activeToolData = ALL_TOOLS.find(t => t.id === activeTool);
 
-  const filteredCategories = TOOL_CATEGORIES.map(category => {
+  const filteredCategories = ALL_CATEGORIES.map(category => {
     const filteredTools = category.tools.filter(toolId => {
-      const tool = TOOLS.find(t => t.id === toolId);
+      const tool = ALL_TOOLS.find(t => t.id === toolId);
       if (!tool) return false;
       const query = searchQuery.toLowerCase();
       return tool.name.toLowerCase().includes(query) || tool.description.toLowerCase().includes(query);
@@ -685,7 +710,7 @@ export default function App() {
                     <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2">{category.name}</h3>
                     <div className="space-y-1">
                       {category.tools.map(toolId => {
-                        const tool = TOOLS.find(t => t.id === toolId)!;
+                        const tool = ALL_TOOLS.find(t => t.id === toolId)!;
                         const isActive = activeTool === tool.id;
                         const Icon = tool.icon;
                         return (
@@ -708,6 +733,15 @@ export default function App() {
                   </div>
                 ))
               )}
+            </div>
+            <div className="pt-6 mt-6 border-t border-border/50">
+              <button
+                onClick={() => setIsCustomToolModalOpen(true)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary/10 text-primary hover:bg-primary/20 rounded-xl text-sm font-semibold transition-all"
+              >
+                <Sparkles size={16} />
+                Create Custom Tool
+              </button>
             </div>
           </div>
         </aside>
@@ -764,7 +798,7 @@ export default function App() {
                         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2">{category.name}</h3>
                         <div className="space-y-1">
                           {category.tools.map(toolId => {
-                            const tool = TOOLS.find(t => t.id === toolId)!;
+                            const tool = ALL_TOOLS.find(t => t.id === toolId)!;
                             const isActive = activeTool === tool.id;
                             const Icon = tool.icon;
                             return (
@@ -787,6 +821,15 @@ export default function App() {
                       </div>
                     ))
                   )}
+                  <div className="pt-6 mt-6 border-t border-border/50">
+                    <button
+                      onClick={() => { setIsCustomToolModalOpen(true); setIsToolsOpen(false); }}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary/10 text-primary hover:bg-primary/20 rounded-xl text-sm font-semibold transition-all"
+                    >
+                      <Sparkles size={16} />
+                      Create Custom Tool
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             </>
@@ -1043,6 +1086,22 @@ export default function App() {
                                   </div>
                                 </div>
                                 <div className="space-y-2">
+                                  <label className="block text-sm font-semibold text-foreground/80">Human-Like Level: {inputData.humanLevel ?? 0.9}</label>
+                                  <input 
+                                    type="range" 
+                                    min="0" max="1" step="0.1"
+                                    value={inputData.humanLevel ?? 0.9}
+                                    onChange={(e) => updateInputData({...inputData, humanLevel: parseFloat(e.target.value)})}
+                                    className="w-full accent-primary"
+                                  />
+                                  <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>Standard</span>
+                                    <span>Ultra Human</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div className="space-y-2">
                                   <label className="block text-sm font-semibold text-foreground/80">Style Preset</label>
                                   <select 
                                     value={inputData.stylePreset || STYLE_PRESETS[0]}
@@ -1052,16 +1111,16 @@ export default function App() {
                                     {STYLE_PRESETS.map(p => <option key={p} value={p}>{p}</option>)}
                                   </select>
                                 </div>
-                              </div>
-                              <div className="space-y-2">
-                                <label className="block text-sm font-semibold text-foreground/80">Negative Prompts (Avoid these words/topics)</label>
-                                <input 
-                                  type="text"
-                                  value={inputData.negativePrompt || ''}
-                                  onChange={(e) => updateInputData({...inputData, negativePrompt: e.target.value})}
-                                  placeholder="e.g., jargon, emojis, overly enthusiastic tone"
-                                  className="w-full glass-input rounded-xl p-3"
-                                />
+                                <div className="space-y-2">
+                                  <label className="block text-sm font-semibold text-foreground/80">Negative Prompts</label>
+                                  <input 
+                                    type="text"
+                                    value={inputData.negativePrompt || ''}
+                                    onChange={(e) => updateInputData({...inputData, negativePrompt: e.target.value})}
+                                    placeholder="e.g., jargon, emojis"
+                                    className="w-full glass-input rounded-xl p-3"
+                                  />
+                                </div>
                               </div>
                             </motion.div>
                           )}
@@ -1272,6 +1331,107 @@ export default function App() {
                     </button>
                   </form>
                 )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Tool Modal */}
+      <AnimatePresence>
+        {isCustomToolModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setIsCustomToolModalOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg bg-background/95 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-border/50 flex items-center justify-between bg-muted/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                    <Sparkles size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Create Custom Tool</h2>
+                    <p className="text-sm text-muted-foreground">Build your own AI tool</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsCustomToolModalOpen(false)}
+                  className="p-2 hover:bg-muted rounded-full transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newCustomTool.name || !newCustomTool.systemInstruction) {
+                      toast.error('Name and System Instructions are required.');
+                      return;
+                    }
+                    const newTool = {
+                      id: `custom-${Date.now()}`,
+                      name: newCustomTool.name,
+                      description: newCustomTool.description || 'Custom user tool',
+                      systemInstruction: newCustomTool.systemInstruction,
+                      isCustom: true
+                    };
+                    const updatedTools = [...customTools, newTool];
+                    setCustomTools(updatedTools);
+                    localStorage.setItem('customTools', JSON.stringify(updatedTools));
+                    setNewCustomTool({ name: '', description: '', systemInstruction: '' });
+                    setIsCustomToolModalOpen(false);
+                    setActiveTool(newTool.id);
+                    toast.success('Custom tool created!');
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">Tool Name *</label>
+                    <input
+                      type="text"
+                      value={newCustomTool.name}
+                      onChange={(e) => setNewCustomTool({ ...newCustomTool, name: e.target.value })}
+                      placeholder="e.g., Cold Email Writer"
+                      className="w-full bg-muted/50 border border-border/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">Description</label>
+                    <input
+                      type="text"
+                      value={newCustomTool.description}
+                      onChange={(e) => setNewCustomTool({ ...newCustomTool, description: e.target.value })}
+                      placeholder="e.g., Writes high-converting cold emails"
+                      className="w-full bg-muted/50 border border-border/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">System Instructions *</label>
+                    <textarea
+                      value={newCustomTool.systemInstruction}
+                      onChange={(e) => setNewCustomTool({ ...newCustomTool, systemInstruction: e.target.value })}
+                      placeholder="e.g., You are an expert copywriter. Write a cold email based on the user's input..."
+                      className="w-full h-32 bg-muted/50 border border-border/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all resize-none"
+                      required
+                    />
+                  </div>
+                  <button type="submit" className="w-full glass-button py-3 rounded-xl font-medium flex items-center justify-center gap-2">
+                    <Check size={18} /> Create Tool
+                  </button>
+                </form>
               </div>
             </motion.div>
           </div>

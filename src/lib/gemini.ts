@@ -1,12 +1,21 @@
+/// <reference types="vite/client" />
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const getApiKey = () => {
+  if (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) {
+    return process.env.GEMINI_API_KEY;
+  }
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) {
+    return import.meta.env.VITE_GEMINI_API_KEY;
+  }
+  return "";
+};
 
 interface GenerateOptions {
   prompt: string;
   systemInstruction: string;
   creativityLevel?: number;
+  humanLevel?: number;
   negativePrompt?: string;
   stylePreset?: string;
   apiKey?: string;
@@ -16,12 +25,19 @@ export async function generateScript({
   prompt,
   systemInstruction,
   creativityLevel = 0.7,
+  humanLevel = 0.9,
   negativePrompt = "",
   stylePreset = "Natural",
   apiKey,
 }: GenerateOptions): Promise<string> {
   try {
-    const aiInstance = apiKey ? new GoogleGenAI({ apiKey }) : ai;
+    const finalKey = apiKey || getApiKey();
+    
+    if (!finalKey) {
+      throw new Error("API key is missing. Please add your Gemini API key in the settings or environment variables.");
+    }
+
+    const aiInstance = new GoogleGenAI({ apiKey: finalKey });
 
     // Inject strong human-like instructions
     const enhancedSystemInstruction = `
@@ -34,6 +50,7 @@ CRITICAL WRITING GUIDELINES:
 - Keep the tone conversational, authentic, and engaging.
 - Use varied sentence structures and natural pacing.
 - Style Preset Applied: ${stylePreset}. Adapt the tone to match this style perfectly.
+- Human-like Quality Level: ${Math.round(humanLevel * 100)}%. ${humanLevel > 0.8 ? 'Make it indistinguishable from a real human, with slight imperfections or conversational filler if appropriate.' : ''}
 ${negativePrompt ? `- AVOID the following elements strictly: ${negativePrompt}` : ""}
     `.trim();
 
@@ -48,6 +65,9 @@ ${negativePrompt ? `- AVOID the following elements strictly: ${negativePrompt}` 
     return response.text || "Failed to generate content.";
   } catch (error) {
     console.error("Gemini API Error:", error);
+    if (error instanceof Error) {
+      throw new Error(`Failed to generate content: ${error.message}`);
+    }
     throw new Error("Failed to generate content. Please try again.");
   }
 }
