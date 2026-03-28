@@ -9,6 +9,7 @@ interface GenerateOptions {
   creativityLevel?: number;
   negativePrompt?: string;
   stylePreset?: string;
+  apiKey?: string;
 }
 
 export async function generateScript({
@@ -17,8 +18,11 @@ export async function generateScript({
   creativityLevel = 0.7,
   negativePrompt = "",
   stylePreset = "Natural",
+  apiKey,
 }: GenerateOptions): Promise<string> {
   try {
+    const aiInstance = apiKey ? new GoogleGenAI({ apiKey }) : ai;
+
     // Inject strong human-like instructions
     const enhancedSystemInstruction = `
 ${systemInstruction}
@@ -33,7 +37,7 @@ CRITICAL WRITING GUIDELINES:
 ${negativePrompt ? `- AVOID the following elements strictly: ${negativePrompt}` : ""}
     `.trim();
 
-    const response = await ai.models.generateContent({
+    const response = await aiInstance.models.generateContent({
       model: "gemini-3.1-pro-preview",
       contents: prompt,
       config: {

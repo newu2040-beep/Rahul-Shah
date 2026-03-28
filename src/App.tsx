@@ -13,7 +13,7 @@ import {
   UserCircle, Twitter, Megaphone, Sun, Moon, LogOut, 
   Menu, X, Copy, Download, RefreshCw, Check,
   Linkedin, Video, ShieldAlert, Mic, Newspaper, Loader2, Settings2, Palette,
-  Undo2, Redo2, ChevronDown, ChevronUp, SlidersHorizontal, LayoutGrid
+  Undo2, Redo2, ChevronDown, ChevronUp, SlidersHorizontal, LayoutGrid, Settings, Lock, Unlock, Key
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -175,6 +175,18 @@ export default function App() {
   const [editedOutput, setEditedOutput] = useState('');
   const [isToolsOpen, setIsToolsOpen] = useState(false);
 
+  // Search State
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // API Key State
+  const [isApiModalOpen, setIsApiModalOpen] = useState(false);
+  const [savedApiKey, setSavedApiKey] = useState('');
+  const [savedApiPassword, setSavedApiPassword] = useState('Secretkey000₩');
+  const [isApiUnlocked, setIsApiUnlocked] = useState(false);
+  const [apiPasswordInput, setApiPasswordInput] = useState('');
+  const [tempApiKey, setTempApiKey] = useState('');
+  const [tempApiPassword, setTempApiPassword] = useState('');
+
   const outputRef = useRef<HTMLDivElement>(null);
 
   const handleSuggestIdea = () => {
@@ -196,6 +208,11 @@ export default function App() {
 
     setColorTheme(savedColorTheme);
     document.documentElement.setAttribute('data-theme', savedColorTheme);
+
+    const storedApiKey = localStorage.getItem('customApiKey');
+    const storedApiPassword = localStorage.getItem('apiPassword');
+    if (storedApiKey) setSavedApiKey(storedApiKey);
+    if (storedApiPassword) setSavedApiPassword(storedApiPassword);
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -245,6 +262,30 @@ export default function App() {
     } catch (error) {
       console.error(error);
     }
+  };
+
+  const handleUnlockApi = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (apiPasswordInput === savedApiPassword) {
+      setIsApiUnlocked(true);
+      setTempApiKey(savedApiKey);
+      setTempApiPassword(savedApiPassword);
+      setApiPasswordInput('');
+      toast.success('API Settings Unlocked');
+    } else {
+      toast.error('Incorrect password');
+    }
+  };
+
+  const handleSaveApiSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavedApiKey(tempApiKey);
+    setSavedApiPassword(tempApiPassword || 'Secretkey000₩');
+    localStorage.setItem('customApiKey', tempApiKey);
+    localStorage.setItem('apiPassword', tempApiPassword || 'Secretkey000₩');
+    toast.success('API Settings Saved');
+    setIsApiModalOpen(false);
+    setIsApiUnlocked(false);
   };
 
   const handleGenerate = async (e?: React.FormEvent) => {
@@ -324,7 +365,8 @@ export default function App() {
         systemInstruction,
         creativityLevel: inputData.creativityLevel ?? 0.7,
         negativePrompt: inputData.negativePrompt ?? '',
-        stylePreset: inputData.stylePreset ?? 'Natural'
+        stylePreset: inputData.stylePreset ?? 'Natural',
+        apiKey: savedApiKey || undefined
       });
       setOutput(result);
       setEditedOutput(result);
@@ -411,6 +453,16 @@ export default function App() {
   }
 
   const activeToolData = TOOLS.find(t => t.id === activeTool);
+
+  const filteredCategories = TOOL_CATEGORIES.map(category => {
+    const filteredTools = category.tools.filter(toolId => {
+      const tool = TOOLS.find(t => t.id === toolId);
+      if (!tool) return false;
+      const query = searchQuery.toLowerCase();
+      return tool.name.toLowerCase().includes(query) || tool.description.toLowerCase().includes(query);
+    });
+    return { ...category, tools: filteredTools };
+  }).filter(category => category.tools.length > 0);
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 relative z-0 overflow-x-hidden">
@@ -585,11 +637,19 @@ export default function App() {
                 <button onClick={handleLogout} className="w-full py-3 text-center text-red-500 font-medium flex items-center justify-center gap-2 rounded-xl hover:bg-red-500/10 transition-colors">
                   <LogOut size={18} /> {user ? 'Logout' : 'Exit Mode'}
                 </button>
+                <button onClick={() => { setIsApiModalOpen(true); setIsMobileMenuOpen(false); }} className="w-full py-3 text-center text-muted-foreground font-medium flex items-center justify-center gap-2 rounded-xl hover:bg-muted transition-colors">
+                  <Settings size={18} /> API Settings
+                </button>
               </div>
             ) : (
-              <button onClick={handleLogin} className="w-full glass-button py-3 rounded-xl font-medium flex items-center justify-center gap-2">
-                <UserCircle size={20} /> Sign In with Google
-              </button>
+              <div className="flex flex-col gap-4">
+                <button onClick={handleLogin} className="w-full glass-button py-3 rounded-xl font-medium flex items-center justify-center gap-2">
+                  <UserCircle size={20} /> Sign In with Google
+                </button>
+                <button onClick={() => { setIsApiModalOpen(true); setIsMobileMenuOpen(false); }} className="w-full py-3 text-center text-muted-foreground font-medium flex items-center justify-center gap-2 rounded-xl hover:bg-muted transition-colors">
+                  <Settings size={18} /> API Settings
+                </button>
+              </div>
             )}
           </motion.div>
         )}
@@ -600,38 +660,54 @@ export default function App() {
         {/* Sidebar - Desktop */}
         <aside className="hidden lg:block w-64 flex-shrink-0">
           <div className="sticky top-24 glass-panel p-4 h-[calc(100vh-8rem)] overflow-y-auto hide-scrollbar">
-            <div className="flex items-center gap-2 mb-6 px-2">
+            <div className="flex items-center gap-2 mb-4 px-2">
               <LayoutGrid size={18} className="text-primary" />
               <h2 className="text-sm font-bold text-foreground tracking-wide">AI Tools Library</h2>
             </div>
+            <div className="mb-4 px-2">
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search tools..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-muted/50 border border-border/50 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                />
+              </div>
+            </div>
             <div className="space-y-6">
-              {TOOL_CATEGORIES.map(category => (
-                <div key={category.name} className="space-y-2">
-                  <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2">{category.name}</h3>
-                  <div className="space-y-1">
-                    {category.tools.map(toolId => {
-                      const tool = TOOLS.find(t => t.id === toolId)!;
-                      const isActive = activeTool === tool.id;
-                      const Icon = tool.icon;
-                      return (
-                        <button
-                          key={tool.id}
-                          onClick={() => { setActiveTool(tool.id); setOutput(''); setInputData({}); }}
-                          className={cn(
-                            "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left",
-                            isActive 
-                              ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
-                              : "hover:bg-white/40 dark:hover:bg-white/5 text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          <Icon size={18} className={isActive ? "text-primary-foreground" : "text-primary"} />
-                          <span className="truncate">{tool.name}</span>
-                        </button>
-                      );
-                    })}
+              {filteredCategories.length === 0 ? (
+                <div className="text-center text-sm text-muted-foreground py-8">No tools found</div>
+              ) : (
+                filteredCategories.map(category => (
+                  <div key={category.name} className="space-y-2">
+                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2">{category.name}</h3>
+                    <div className="space-y-1">
+                      {category.tools.map(toolId => {
+                        const tool = TOOLS.find(t => t.id === toolId)!;
+                        const isActive = activeTool === tool.id;
+                        const Icon = tool.icon;
+                        return (
+                          <button
+                            key={tool.id}
+                            onClick={() => { setActiveTool(tool.id); setOutput(''); setInputData({}); }}
+                            className={cn(
+                              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left",
+                              isActive 
+                                ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
+                                : "hover:bg-white/40 dark:hover:bg-white/5 text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            <Icon size={18} className={isActive ? "text-primary-foreground" : "text-primary"} />
+                            <span className="truncate">{tool.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </aside>
@@ -658,43 +734,59 @@ export default function App() {
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                 className="fixed bottom-0 left-0 right-0 h-[85vh] bg-card border-t border-border z-50 rounded-t-3xl shadow-2xl lg:hidden flex flex-col"
               >
-                <div className="p-4 border-b border-border flex items-center justify-between bg-card/50 backdrop-blur-md rounded-t-3xl sticky top-0 z-10">
-                  <div className="flex items-center gap-2 px-2">
-                    <LayoutGrid size={18} className="text-primary" />
-                    <h2 className="text-base font-bold text-foreground tracking-wide">AI Tools Library</h2>
+                <div className="p-4 border-b border-border flex flex-col gap-3 bg-card/50 backdrop-blur-md rounded-t-3xl sticky top-0 z-10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 px-2">
+                      <LayoutGrid size={18} className="text-primary" />
+                      <h2 className="text-base font-bold text-foreground tracking-wide">AI Tools Library</h2>
+                    </div>
+                    <button onClick={() => setIsToolsOpen(false)} className="p-2 bg-muted rounded-full text-muted-foreground hover:text-foreground">
+                      <X size={20} />
+                    </button>
                   </div>
-                  <button onClick={() => setIsToolsOpen(false)} className="p-2 bg-muted rounded-full text-muted-foreground hover:text-foreground">
-                    <X size={20} />
-                  </button>
+                  <div className="relative px-2">
+                    <Search size={16} className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search tools..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-muted/50 border border-border/50 rounded-lg pl-10 pr-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+                    />
+                  </div>
                 </div>
                 <div className="p-4 overflow-y-auto hide-scrollbar flex-1 space-y-6 pb-24">
-                  {TOOL_CATEGORIES.map(category => (
-                    <div key={category.name} className="space-y-2">
-                      <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2">{category.name}</h3>
-                      <div className="space-y-1">
-                        {category.tools.map(toolId => {
-                          const tool = TOOLS.find(t => t.id === toolId)!;
-                          const isActive = activeTool === tool.id;
-                          const Icon = tool.icon;
-                          return (
-                            <button
-                              key={tool.id}
-                              onClick={() => { setActiveTool(tool.id); setOutput(''); setInputData({}); setIsToolsOpen(false); }}
-                              className={cn(
-                                "w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-left",
-                                isActive 
-                                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
-                                  : "bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground"
-                              )}
-                            >
-                              <Icon size={18} className={isActive ? "text-primary-foreground" : "text-primary"} />
-                              <span className="truncate">{tool.name}</span>
-                            </button>
-                          );
-                        })}
+                  {filteredCategories.length === 0 ? (
+                    <div className="text-center text-sm text-muted-foreground py-8">No tools found</div>
+                  ) : (
+                    filteredCategories.map(category => (
+                      <div key={category.name} className="space-y-2">
+                        <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2">{category.name}</h3>
+                        <div className="space-y-1">
+                          {category.tools.map(toolId => {
+                            const tool = TOOLS.find(t => t.id === toolId)!;
+                            const isActive = activeTool === tool.id;
+                            const Icon = tool.icon;
+                            return (
+                              <button
+                                key={tool.id}
+                                onClick={() => { setActiveTool(tool.id); setOutput(''); setInputData({}); setIsToolsOpen(false); }}
+                                className={cn(
+                                  "w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-left",
+                                  isActive 
+                                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
+                                    : "bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground"
+                                )}
+                              >
+                                <Icon size={18} className={isActive ? "text-primary-foreground" : "text-primary"} />
+                                <span className="truncate">{tool.name}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </motion.div>
             </>
@@ -1113,6 +1205,78 @@ export default function App() {
       <footer className="border-t border-border/50 mt-20 py-8 text-center text-sm text-muted-foreground">
         <p>Made with ❤️ by Rahul Shah</p>
       </footer>
+
+      {/* API Key Modal */}
+      <AnimatePresence>
+        {isApiModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-6 border-b border-border flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Key size={20} className="text-primary" /> API Settings
+                </h2>
+                <button onClick={() => setIsApiModalOpen(false)} className="p-2 hover:bg-muted rounded-full transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                {!isApiUnlocked ? (
+                  <form onSubmit={handleUnlockApi} className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <Lock size={16} /> Enter Password to Unlock
+                      </label>
+                      <input
+                        type="password"
+                        value={apiPasswordInput}
+                        onChange={(e) => setApiPasswordInput(e.target.value)}
+                        placeholder="Hint: Secretkey000₩"
+                        className="w-full bg-muted/50 border border-border/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                      />
+                    </div>
+                    <button type="submit" className="w-full glass-button py-3 rounded-xl font-medium flex items-center justify-center gap-2">
+                      <Unlock size={18} /> Unlock Settings
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleSaveApiSettings} className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Custom Gemini API Key</label>
+                      <input
+                        type="password"
+                        value={tempApiKey}
+                        onChange={(e) => setTempApiKey(e.target.value)}
+                        placeholder="AIzaSy..."
+                        className="w-full bg-muted/50 border border-border/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-mono text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">Leave blank to use the default app key.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Set New Password</label>
+                      <input
+                        type="text"
+                        value={tempApiPassword}
+                        onChange={(e) => setTempApiPassword(e.target.value)}
+                        placeholder="Secretkey000₩"
+                        className="w-full bg-muted/50 border border-border/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                      />
+                    </div>
+                    <button type="submit" className="w-full glass-button py-3 rounded-xl font-medium flex items-center justify-center gap-2">
+                      <Check size={18} /> Save Settings
+                    </button>
+                  </form>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
