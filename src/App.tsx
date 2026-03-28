@@ -13,7 +13,7 @@ import {
   UserCircle, Twitter, Megaphone, Sun, Moon, LogOut, 
   Menu, X, Copy, Download, RefreshCw, Check,
   Linkedin, Video, ShieldAlert, Mic, Newspaper, Loader2, Settings2, Palette,
-  Undo2, Redo2
+  Undo2, Redo2, ChevronDown, ChevronUp, SlidersHorizontal, LayoutGrid
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -28,7 +28,12 @@ function cn(...inputs: ClassValue[]) {
 // --- Tool Definitions ---
 const TOOLS = [
   { id: 'script-generator', name: 'Script Generator', icon: Wand2, description: 'Generate high-quality scripts for any platform.' },
+  { id: 'clean-paragraphs', name: 'Clean Paragraphs', icon: AlignLeft, description: 'Convert messy text into clean, readable paragraphs.' },
   { id: 'rewrite-humanizer', name: 'Rewrite & Humanizer', icon: PenTool, description: 'Convert robotic text into natural human tone.' },
+  { id: 'b-roll-planner', name: 'B-Roll Planner', icon: Video, description: 'Suggests engaging B-roll for your script.' },
+  { id: 'content-repurposer', name: 'Content Repurposer', icon: RefreshCw, description: 'Turn a video script into a blog or thread.' },
+  { id: 'yt-community', name: 'YT Community Post', icon: Users, description: 'Engaging polls and text posts.' },
+  { id: 'podcast-notes', name: 'Podcast Notes', icon: Mic, description: 'Structured show notes and timestamps.' },
   { id: 'hook-generator', name: 'Hook Generator', icon: Sparkles, description: 'Viral opening lines for your videos.' },
   { id: 'title-generator', name: 'Title Generator', icon: FileText, description: 'SEO click-worthy titles.' },
   { id: 'hashtag-generator', name: 'Hashtag Generator', icon: Hash, description: 'Trending hashtags for maximum reach.' },
@@ -54,6 +59,39 @@ const TOOLS = [
 const PLATFORMS = ['YouTube Long', 'YouTube Shorts', 'TikTok', 'Instagram Reels', 'Facebook', 'LinkedIn', 'Twitter Thread', 'Blog Post', 'Podcast', 'Storytelling', 'Ads', 'Webinar', 'Sales Pitch', 'Custom'];
 const TONES = ['Emotional', 'Cinematic', 'Casual', 'Professional', 'Storytelling', 'Humorous', 'Inspirational', 'Witty', 'Sarcastic', 'Empathetic', 'Authoritative', 'Controversial', 'Educational', 'Custom'];
 const LENGTHS = ['Micro (15s)', 'Short (30s-1m)', 'Medium (1m-3m)', 'Long (3m-10m)', 'Epic (10m+)', 'Custom'];
+const GENRES = ['General', 'Comedy', 'Drama', 'Horror', 'Romance', 'Documentary', 'Vlog', 'Educational', 'Tech Review', 'Gaming', 'True Crime', 'Finance', 'Custom'];
+const STYLE_PRESETS = ['Natural', 'Storyteller', 'Direct & Punchy', 'Academic', 'Conversational', 'Dramatic'];
+
+const TOOL_CATEGORIES = [
+  {
+    name: 'Video & Audio',
+    tools: ['script-generator', 'b-roll-planner', 'video-concept', 'podcast-notes', 'thumbnail-ideas']
+  },
+  {
+    name: 'Social Media',
+    tools: ['linkedin-post', 'tweet-writer', 'yt-community', 'hashtag-generator', 'bio-generator']
+  },
+  {
+    name: 'Writing & Editing',
+    tools: ['rewrite-humanizer', 'clean-paragraphs', 'script-improver', 'summarizer', 'dialogue-writer', 'email-writer', 'newsletter-writer', 'ad-copy']
+  },
+  {
+    name: 'Strategy & Ideas',
+    tools: ['hook-generator', 'title-generator', 'story-ideas', 'outline-builder', 'seo-description', 'content-repurposer', 'objection-handler', 'interview-questions']
+  }
+];
+
+const IDEA_SUGGESTIONS = [
+  "The hidden psychology of why we procrastinate...",
+  "How to build a $10k/mo business with zero code",
+  "The dark truth about the fast fashion industry",
+  "Why dopamine detoxing is ruining your productivity",
+  "I tried the 5 AM club for 30 days and here's what happened",
+  "The secret framework Apple uses to sell products",
+  "10 things I wish I knew before turning 20",
+  "How AI is secretly changing the music industry",
+  "The bizarre history of the world's most expensive coffee"
+];
 
 const COLOR_THEMES = [
   { id: 'lavender', name: 'Lavender', color: 'bg-violet-500' },
@@ -61,6 +99,10 @@ const COLOR_THEMES = [
   { id: 'peach', name: 'Peach', color: 'bg-orange-500' },
   { id: 'rose', name: 'Rose', color: 'bg-rose-500' },
   { id: 'sky', name: 'Sky', color: 'bg-sky-500' },
+  { id: 'sunset', name: 'Sunset', color: 'bg-pink-500' },
+  { id: 'ocean', name: 'Ocean', color: 'bg-teal-500' },
+  { id: 'forest', name: 'Forest', color: 'bg-green-600' },
+  { id: 'berry', name: 'Berry', color: 'bg-fuchsia-600' },
 ];
 
 export default function App() {
@@ -77,6 +119,7 @@ export default function App() {
   const [customPlatform, setCustomPlatform] = useState('');
   const [customTone, setCustomTone] = useState('');
   const [customLength, setCustomLength] = useState('');
+  const [customGenre, setCustomGenre] = useState('');
   
   const [past, setPast] = useState<Record<string, any>[]>([]);
   const [future, setFuture] = useState<Record<string, any>[]>([]);
@@ -126,8 +169,17 @@ export default function App() {
   const [output, setOutput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isEditingOutput, setIsEditingOutput] = useState(false);
+  const [editedOutput, setEditedOutput] = useState('');
+  const [isToolsOpen, setIsToolsOpen] = useState(false);
 
   const outputRef = useRef<HTMLDivElement>(null);
+
+  const handleSuggestIdea = () => {
+    const random = IDEA_SUGGESTIONS[Math.floor(Math.random() * IDEA_SUGGESTIONS.length)];
+    updateInputData({...inputData, topic: random, text: random});
+  };
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
@@ -210,12 +262,34 @@ export default function App() {
           const actualPlatform = inputData.platform === 'Custom' ? customPlatform : (inputData.platform || PLATFORMS[0]);
           const actualTone = inputData.tone === 'Custom' ? customTone : (inputData.tone || TONES[0]);
           const actualLength = inputData.length === 'Custom' ? customLength : (inputData.length || LENGTHS[2]);
+          const actualGenre = inputData.genre === 'Custom' ? customGenre : (inputData.genre || GENRES[0]);
 
           if (inputData.platform === 'Custom' && !customPlatform) throw new Error('Custom platform is required.');
           if (inputData.tone === 'Custom' && !customTone) throw new Error('Custom tone is required.');
           if (inputData.length === 'Custom' && !customLength) throw new Error('Custom length is required.');
+          if (inputData.genre === 'Custom' && !customGenre) throw new Error('Custom genre is required.');
 
-          prompt = `Write a ${actualLength} script for ${actualPlatform} about "${topic}". Tone: ${actualTone}. Additional instructions: ${instructions || 'None'}. Make it engaging with a strong hook, build-up, and CTA.`;
+          prompt = `Write a ${actualLength} script for ${actualPlatform} about "${topic}". Genre: ${actualGenre}. Tone: ${actualTone}. Additional instructions: ${instructions || 'None'}. Make it engaging with a strong hook, build-up, and CTA.`;
+          break;
+        case 'clean-paragraphs':
+          if (!inputData.text) throw new Error('Text is required.');
+          prompt = `Convert the following messy text into clean, readable paragraphs. Remove unnecessary words, filler, and headings. Make it simple, easy to copy, and ready to send. Do not add any introductory or concluding remarks. Just the clean text:\n\n${inputData.text}`;
+          break;
+        case 'b-roll-planner':
+          if (!inputData.text) throw new Error('Script text is required.');
+          prompt = `Read the following script and suggest highly engaging, visual B-roll shots for each section. Format it as a clean list or table:\n\n${inputData.text}`;
+          break;
+        case 'content-repurposer':
+          if (!inputData.text) throw new Error('Content is required.');
+          prompt = `Repurpose the following content into a highly engaging Twitter thread and a LinkedIn post. Keep the core message but adapt the format perfectly for each platform:\n\n${inputData.text}`;
+          break;
+        case 'yt-community':
+          if (!inputData.topic) throw new Error('Topic is required.');
+          prompt = `Write an engaging YouTube Community post about "${inputData.topic}". Make it interactive, ask a question, and include a poll idea with 3-4 options if relevant.`;
+          break;
+        case 'podcast-notes':
+          if (!inputData.text) throw new Error('Podcast transcript or summary is required.');
+          prompt = `Create professional podcast show notes from the following text. Include a catchy title, a brief summary, 3-5 key takeaways, and suggested timestamps:\n\n${inputData.text}`;
           break;
         case 'rewrite-humanizer':
           if (!inputData.text) throw new Error('Text is required.');
@@ -235,8 +309,16 @@ export default function App() {
           prompt = `Task: ${tool.name}. Input: "${input}". Generate high-quality, human-like output optimized for engagement.`;
       }
 
-      const result = await generateScript(prompt, systemInstruction);
+      const result = await generateScript({
+        prompt, 
+        systemInstruction,
+        creativityLevel: inputData.creativityLevel ?? 0.7,
+        negativePrompt: inputData.negativePrompt ?? '',
+        stylePreset: inputData.stylePreset ?? 'Natural'
+      });
       setOutput(result);
+      setEditedOutput(result);
+      setIsEditingOutput(false);
 
       // Save to Firestore
       try {
@@ -263,16 +345,18 @@ export default function App() {
   };
 
   const handleCopy = () => {
-    if (!output) return;
-    navigator.clipboard.writeText(output);
+    const textToCopy = isEditingOutput ? editedOutput : output;
+    if (!textToCopy) return;
+    navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     toast.success('Copied to clipboard!');
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownload = () => {
-    if (!output) return;
-    const blob = new Blob([output], { type: 'text/plain' });
+    const textToDownload = isEditingOutput ? editedOutput : output;
+    if (!textToDownload) return;
+    const blob = new Blob([textToDownload], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -461,41 +545,109 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-8">
         
-        {/* Sidebar / Tools List */}
-        <aside className="lg:w-64 flex-shrink-0">
-          <div className="lg:sticky lg:top-24">
-            <div className="flex items-center gap-2 mb-4 px-2">
-              <Settings2 size={16} className="text-muted-foreground hidden lg:block" />
-              <h2 className="hidden lg:block text-xs font-bold text-muted-foreground uppercase tracking-wider">AI Tools Suite</h2>
+        {/* Sidebar - Desktop */}
+        <aside className="hidden lg:block w-64 flex-shrink-0">
+          <div className="sticky top-24 glass-panel p-4 h-[calc(100vh-8rem)] overflow-y-auto hide-scrollbar">
+            <div className="flex items-center gap-2 mb-6 px-2">
+              <LayoutGrid size={18} className="text-primary" />
+              <h2 className="text-sm font-bold text-foreground tracking-wide">AI Tools Library</h2>
             </div>
-            <div className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-y-auto pb-4 lg:pb-10 lg:h-[calc(100vh-12rem)] snap-x hide-scrollbar">
-              {TOOLS.map((tool, index) => {
-                const Icon = tool.icon;
-                const isActive = activeTool === tool.id;
-                return (
-                  <motion.button
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.03 }}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    key={tool.id}
-                    onClick={() => { setActiveTool(tool.id); setOutput(''); setInputData({}); }}
-                    className={cn(
-                      "flex-shrink-0 lg:w-full flex items-center gap-2 lg:gap-3 px-4 py-3 lg:px-3 lg:py-2.5 rounded-xl text-sm font-medium transition-colors duration-200 text-left snap-start",
-                      isActive 
-                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
-                        : "glass hover:bg-white/40 dark:hover:bg-white/5 text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <Icon size={18} className={isActive ? "text-primary-foreground" : "text-primary"} />
-                    <span className="whitespace-nowrap lg:whitespace-normal lg:truncate">{tool.name}</span>
-                  </motion.button>
-                );
-              })}
+            <div className="space-y-6">
+              {TOOL_CATEGORIES.map(category => (
+                <div key={category.name} className="space-y-2">
+                  <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2">{category.name}</h3>
+                  <div className="space-y-1">
+                    {category.tools.map(toolId => {
+                      const tool = TOOLS.find(t => t.id === toolId)!;
+                      const isActive = activeTool === tool.id;
+                      const Icon = tool.icon;
+                      return (
+                        <button
+                          key={tool.id}
+                          onClick={() => { setActiveTool(tool.id); setOutput(''); setInputData({}); }}
+                          className={cn(
+                            "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left",
+                            isActive 
+                              ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
+                              : "hover:bg-white/40 dark:hover:bg-white/5 text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          <Icon size={18} className={isActive ? "text-primary-foreground" : "text-primary"} />
+                          <span className="truncate">{tool.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </aside>
+
+        {/* Mobile FAB */}
+        <button 
+          onClick={() => setIsToolsOpen(true)}
+          className="lg:hidden fixed bottom-6 right-6 z-40 bg-primary text-primary-foreground p-4 rounded-full shadow-xl hover:scale-105 active:scale-95 transition-all"
+        >
+          <LayoutGrid size={24} />
+        </button>
+
+        {/* Mobile Tools Modal */}
+        <AnimatePresence>
+          {isToolsOpen && (
+            <>
+              <motion.div 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setIsToolsOpen(false)}
+                className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 lg:hidden"
+              />
+              <motion.div 
+                initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="fixed bottom-0 left-0 right-0 h-[85vh] bg-card border-t border-border z-50 rounded-t-3xl shadow-2xl lg:hidden flex flex-col"
+              >
+                <div className="p-4 border-b border-border flex items-center justify-between bg-card/50 backdrop-blur-md rounded-t-3xl sticky top-0 z-10">
+                  <div className="flex items-center gap-2 px-2">
+                    <LayoutGrid size={18} className="text-primary" />
+                    <h2 className="text-base font-bold text-foreground tracking-wide">AI Tools Library</h2>
+                  </div>
+                  <button onClick={() => setIsToolsOpen(false)} className="p-2 bg-muted rounded-full text-muted-foreground hover:text-foreground">
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="p-4 overflow-y-auto hide-scrollbar flex-1 space-y-6 pb-24">
+                  {TOOL_CATEGORIES.map(category => (
+                    <div key={category.name} className="space-y-2">
+                      <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-2">{category.name}</h3>
+                      <div className="space-y-1">
+                        {category.tools.map(toolId => {
+                          const tool = TOOLS.find(t => t.id === toolId)!;
+                          const isActive = activeTool === tool.id;
+                          const Icon = tool.icon;
+                          return (
+                            <button
+                              key={tool.id}
+                              onClick={() => { setActiveTool(tool.id); setOutput(''); setInputData({}); setIsToolsOpen(false); }}
+                              className={cn(
+                                "w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-left",
+                                isActive 
+                                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
+                                  : "bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              <Icon size={18} className={isActive ? "text-primary-foreground" : "text-primary"} />
+                              <span className="truncate">{tool.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
         {/* Main Content Area */}
         <div className="flex-1 max-w-3xl w-full">
@@ -505,7 +657,7 @@ export default function App() {
               animate={{ opacity: 1, scale: 1 }}
               className="glass-panel p-8 sm:p-12 text-center flex flex-col items-center justify-center min-h-[60vh]"
             >
-              <div className="w-24 h-24 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full flex items-center justify-center mb-8 shadow-inner border border-white/10">
+              <div className="w-24 h-24 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full flex items-center justify-center mb-8 shadow-inner border border-white/10 animate-float">
                 <Sparkles className="w-12 h-12 text-primary" />
               </div>
               <h1 className="text-3xl sm:text-4xl font-bold mb-4 tracking-tight">Welcome to Brilliantlabs</h1>
@@ -548,25 +700,34 @@ export default function App() {
                       <motion.div layout>
                         <div className="flex items-center justify-between mb-2">
                           <label className="block text-sm font-semibold text-foreground/80">Topic or Idea</label>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-2">
                             <button 
                               type="button"
-                              onClick={undo}
-                              disabled={past.length === 0}
-                              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                              title="Undo"
+                              onClick={handleSuggestIdea}
+                              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors bg-primary/10 px-2 py-1 rounded-md"
                             >
-                              <Undo2 size={16} />
+                              <Sparkles size={12} /> Suggest Idea
                             </button>
-                            <button 
-                              type="button"
-                              onClick={redo}
-                              disabled={future.length === 0}
-                              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                              title="Redo"
-                            >
-                              <Redo2 size={16} />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button 
+                                type="button"
+                                onClick={undo}
+                                disabled={past.length === 0}
+                                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                title="Undo"
+                              >
+                                <Undo2 size={16} />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={redo}
+                                disabled={future.length === 0}
+                                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                                title="Redo"
+                              >
+                                <Redo2 size={16} />
+                              </button>
+                            </div>
                           </div>
                         </div>
                         <textarea 
@@ -578,7 +739,7 @@ export default function App() {
                         />
                       </motion.div>
                       
-                      <motion.div layout className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                      <motion.div layout className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {/* Platform Select */}
                         <div className="space-y-2">
                           <label className="block text-sm font-semibold text-foreground/80">Platform</label>
@@ -595,6 +756,29 @@ export default function App() {
                                 <input 
                                   type="text" required placeholder="Enter platform..." 
                                   value={customPlatform} onChange={e => setCustomPlatform(e.target.value)}
+                                  className="w-full glass-input rounded-xl p-3 mt-2 text-sm"
+                                />
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+
+                        {/* Genre Select */}
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold text-foreground/80">Genre</label>
+                          <select 
+                            value={inputData.genre || GENRES[0]}
+                            onChange={(e) => updateInputData({...inputData, genre: e.target.value})}
+                            className="w-full glass-input rounded-xl p-3 appearance-none font-medium"
+                          >
+                            {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
+                          </select>
+                          <AnimatePresence>
+                            {inputData.genre === 'Custom' && (
+                              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                                <input 
+                                  type="text" required placeholder="Enter custom genre..." 
+                                  value={customGenre} onChange={e => setCustomGenre(e.target.value)}
                                   className="w-full glass-input rounded-xl p-3 mt-2 text-sm"
                                 />
                               </motion.div>
@@ -659,39 +843,110 @@ export default function App() {
                           className="w-full glass-input rounded-xl p-3"
                         />
                       </motion.div>
+
+                      <motion.div layout>
+                        <button
+                          type="button"
+                          onClick={() => setShowAdvanced(!showAdvanced)}
+                          className="flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+                        >
+                          <SlidersHorizontal size={16} />
+                          Advanced Options
+                          {showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                        
+                        <AnimatePresence>
+                          {showAdvanced && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="overflow-hidden mt-4 space-y-5"
+                            >
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div className="space-y-2">
+                                  <label className="block text-sm font-semibold text-foreground/80">Creativity Level: {inputData.creativityLevel ?? 0.7}</label>
+                                  <input 
+                                    type="range" 
+                                    min="0" max="1" step="0.1"
+                                    value={inputData.creativityLevel ?? 0.7}
+                                    onChange={(e) => updateInputData({...inputData, creativityLevel: parseFloat(e.target.value)})}
+                                    className="w-full accent-primary"
+                                  />
+                                  <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>Precise</span>
+                                    <span>Creative</span>
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="block text-sm font-semibold text-foreground/80">Style Preset</label>
+                                  <select 
+                                    value={inputData.stylePreset || STYLE_PRESETS[0]}
+                                    onChange={(e) => updateInputData({...inputData, stylePreset: e.target.value})}
+                                    className="w-full glass-input rounded-xl p-3 appearance-none font-medium"
+                                  >
+                                    {STYLE_PRESETS.map(p => <option key={p} value={p}>{p}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <label className="block text-sm font-semibold text-foreground/80">Negative Prompts (Avoid these words/topics)</label>
+                                <input 
+                                  type="text"
+                                  value={inputData.negativePrompt || ''}
+                                  onChange={(e) => updateInputData({...inputData, negativePrompt: e.target.value})}
+                                  placeholder="e.g., jargon, emojis, overly enthusiastic tone"
+                                  className="w-full glass-input rounded-xl p-3"
+                                />
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
                     </motion.div>
                   ) : (
                     <motion.div layout>
                       <div className="flex items-center justify-between mb-2">
                         <label className="block text-sm font-semibold text-foreground/80">
-                          {activeTool.includes('rewrite') || activeTool.includes('improver') || activeTool.includes('summarizer') ? 'Text to process' : 'Topic or Idea'}
+                          {activeTool.includes('rewrite') || activeTool.includes('improver') || activeTool.includes('summarizer') || activeTool.includes('clean') ? 'Text to process' : 'Topic or Idea'}
                         </label>
-                        <div className="flex items-center gap-1">
-                          <button 
-                            type="button"
-                            onClick={undo}
-                            disabled={past.length === 0}
-                            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                            title="Undo"
-                          >
-                            <Undo2 size={16} />
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={redo}
-                            disabled={future.length === 0}
-                            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                            title="Redo"
-                          >
-                            <Redo2 size={16} />
-                          </button>
+                        <div className="flex items-center gap-2">
+                          {(!activeTool.includes('rewrite') && !activeTool.includes('improver') && !activeTool.includes('summarizer') && !activeTool.includes('clean')) && (
+                            <button 
+                              type="button"
+                              onClick={handleSuggestIdea}
+                              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors bg-primary/10 px-2 py-1 rounded-md"
+                            >
+                              <Sparkles size={12} /> Suggest Idea
+                            </button>
+                          )}
+                          <div className="flex items-center gap-1">
+                            <button 
+                              type="button"
+                              onClick={undo}
+                              disabled={past.length === 0}
+                              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                              title="Undo"
+                            >
+                              <Undo2 size={16} />
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={redo}
+                              disabled={future.length === 0}
+                              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                              title="Redo"
+                            >
+                              <Redo2 size={16} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                       <textarea 
                         required
                         value={inputData.text || inputData.topic || ''}
-                        onChange={(e) => updateInputData({...inputData, [activeTool.includes('rewrite') || activeTool.includes('improver') || activeTool.includes('summarizer') ? 'text' : 'topic']: e.target.value})}
-                        placeholder={`Enter your ${activeTool.includes('rewrite') ? 'text' : 'topic'} here...`}
+                        onChange={(e) => updateInputData({...inputData, [activeTool.includes('rewrite') || activeTool.includes('improver') || activeTool.includes('summarizer') || activeTool.includes('clean') ? 'text' : 'topic']: e.target.value})}
+                        placeholder={`Enter your ${activeTool.includes('rewrite') || activeTool.includes('clean') ? 'text' : 'topic'} here...`}
                         className="w-full glass-input rounded-xl p-4 min-h-[160px] resize-y"
                       />
                     </motion.div>
@@ -727,9 +982,25 @@ export default function App() {
                     className="glass-panel overflow-hidden mt-8"
                   >
                     <div className="bg-muted/30 px-6 py-4 border-b border-border/50 flex items-center justify-between">
-                      <h3 className="font-semibold flex items-center gap-2">
-                        <Sparkles size={16} className="text-primary" /> Generated Result
-                      </h3>
+                      <div className="flex items-center gap-4">
+                        <h3 className="font-semibold flex items-center gap-2">
+                          <Sparkles size={16} className="text-primary" /> Generated Result
+                        </h3>
+                        <div className="flex bg-muted/50 rounded-lg p-1">
+                          <button
+                            onClick={() => setIsEditingOutput(false)}
+                            className={cn("px-3 py-1 text-xs font-medium rounded-md transition-all", !isEditingOutput ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                          >
+                            Preview
+                          </button>
+                          <button
+                            onClick={() => setIsEditingOutput(true)}
+                            className={cn("px-3 py-1 text-xs font-medium rounded-md transition-all", isEditingOutput ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </div>
                       <div className="flex items-center gap-1 sm:gap-2">
                         <button onClick={handleCopy} className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground" title="Copy to clipboard">
                           {copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
@@ -743,9 +1014,19 @@ export default function App() {
                       </div>
                     </div>
                     <div className="p-6 sm:p-8">
-                      <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none whitespace-pre-wrap font-sans leading-relaxed">
-                        {output}
-                      </div>
+                      {isEditingOutput ? (
+                        <textarea
+                          value={editedOutput}
+                          onChange={(e) => setEditedOutput(e.target.value)}
+                          className="w-full min-h-[400px] bg-transparent resize-y outline-none font-sans leading-relaxed text-sm sm:text-base hide-scrollbar"
+                          placeholder="Edit your generated content here..."
+                          autoFocus
+                        />
+                      ) : (
+                        <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none whitespace-pre-wrap font-sans leading-relaxed">
+                          {editedOutput}
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 )}

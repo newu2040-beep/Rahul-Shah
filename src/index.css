@@ -98,6 +98,11 @@
     box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
   }
 
+  .glass-input:focus {
+    transform: translateY(-2px);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.05);
+  }
+
   .glass-button {
     @apply bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all duration-300 shadow-[0_4px_12px_rgba(0,0,0,0.1)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.15)];
   }
@@ -113,6 +118,16 @@
   }
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+
+  @keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+  }
+
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
   }
 }
 
