@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the Brilliantlabs platform",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "Generation": {
+      "title": "Generation",
+      "description": "An AI generated script or content piece",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "toolName": { "type": "string" },
+        "promptData": { "type": "string" },
+        "output": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "toolName", "promptData", "output", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "generations/{generationId}": {
+      "schema": { "$ref": "#/entities/Generation" },
+      "description": "User generated content history"
+    }
+  }
+}
