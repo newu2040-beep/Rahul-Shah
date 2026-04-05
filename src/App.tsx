@@ -13,10 +13,11 @@ import {
   UserCircle, Twitter, Megaphone, Sun, Moon, LogOut, 
   Menu, X, Copy, Download, RefreshCw, Check,
   Linkedin, Video, ShieldAlert, Mic, Newspaper, Loader2, Settings2, Palette,
-  Undo2, Redo2, ChevronDown, ChevronUp, SlidersHorizontal, LayoutGrid, Settings, Lock, Unlock, Key, Share2
+  Undo2, Redo2, ChevronDown, ChevronUp, SlidersHorizontal, LayoutGrid, Settings, Lock, Unlock, Key, Share2, HelpCircle, FileDown
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import jsPDF from 'jspdf';
 
 import { auth, db, signInWithPopup, googleProvider, signOut, onAuthStateChanged, collection, addDoc, serverTimestamp, getDoc, doc } from './lib/firebase';
 import { generateScript } from './lib/gemini';
@@ -54,6 +55,10 @@ const TOOLS = [
   { id: 'interview-questions', name: 'Interview Qs', icon: Mic, description: 'Deep podcast interview questions.' },
   { id: 'newsletter-writer', name: 'Newsletter', icon: Newspaper, description: 'Engaging email newsletters.' },
   { id: 'ad-copy', name: 'Ad Copy Writer', icon: Megaphone, description: 'High-converting ad scripts.' },
+  { id: 'meme-ideas', name: 'Meme Ideas', icon: Lightbulb, description: 'Viral meme concepts and captions.' },
+  { id: 'product-description', name: 'Product Desc', icon: Search, description: 'SEO-optimized product descriptions.' },
+  { id: 'course-outline', name: 'Course Outline', icon: FileText, description: 'Structured online course curriculum.' },
+  { id: 'speech-writer', name: 'Speech Writer', icon: Mic, description: 'Inspiring and persuasive speeches.' },
 ];
 
 const PLATFORMS = ['YouTube Long', 'YouTube Shorts', 'TikTok', 'Instagram Reels', 'Facebook', 'LinkedIn', 'Twitter Thread', 'Blog Post', 'Podcast', 'Storytelling', 'Ads', 'Webinar', 'Sales Pitch', 'Custom'];
@@ -61,6 +66,74 @@ const TONES = ['Emotional', 'Cinematic', 'Casual', 'Professional', 'Storytelling
 const LENGTHS = ['Micro (15s)', 'Short (30s-1m)', 'Medium (1m-3m)', 'Long (3m-10m)', 'Epic (10m+)', 'Custom'];
 const GENRES = ['General', 'Comedy', 'Drama', 'Horror', 'Romance', 'Documentary', 'Vlog', 'Educational', 'Tech Review', 'Gaming', 'True Crime', 'Finance', 'Custom'];
 const STYLE_PRESETS = ['Natural', 'Storyteller', 'Direct & Punchy', 'Academic', 'Conversational', 'Dramatic'];
+
+const PROMPT_BEST_PRACTICES: Record<string, { tips: string[], examples: string[] }> = {
+  'script-generator': {
+    tips: [
+      'Be specific about your target audience and their pain points.',
+      'Mention the core message or takeaway you want the viewer to have.',
+      'Specify the pacing (e.g., fast-paced, slow and dramatic).'
+    ],
+    examples: [
+      'Write a 60-second TikTok script about the dangers of hustle culture for young professionals. Keep it punchy and relatable.',
+      'Create a YouTube script explaining quantum computing to a 10-year-old. Use fun analogies.'
+    ]
+  },
+  'hook-generator': {
+    tips: [
+      'Provide the main topic and the surprising element of your video.',
+      'Specify the emotion you want to evoke (curiosity, shock, excitement).'
+    ],
+    examples: [
+      'Give me 5 hooks for a video about why traditional diets fail. Make them controversial.',
+      'I need a curiosity-driven hook for a tech review of the new iPhone.'
+    ]
+  },
+  'title-generator': {
+    tips: [
+      'Include your main keyword.',
+      'Mention the platform (YouTube, Blog, etc.) as title styles vary.',
+      'Indicate if you want clickbait, SEO-focused, or story-driven titles.'
+    ],
+    examples: [
+      'Generate 10 YouTube titles for a vlog about traveling to Japan on a budget. Make them highly clickable.',
+      'Give me 5 SEO-optimized blog titles about "React performance optimization".'
+    ]
+  },
+  'rewrite-humanizer': {
+    tips: [
+      'Paste the text you want to rewrite.',
+      'Specify the desired tone (e.g., casual, professional, empathetic).',
+      'Mention if you want to simplify complex terms or expand on certain points.'
+    ],
+    examples: [
+      'Rewrite this corporate email to sound more friendly and less formal.',
+      'Humanize this AI-generated text about climate change to make it sound like a passionate activist wrote it.'
+    ]
+  },
+  'b-roll-planner': {
+    tips: [
+      'Provide the script or a detailed outline of your video.',
+      'Mention the visual style or mood you are aiming for.',
+      'Specify if you need stock footage suggestions or ideas for filming yourself.'
+    ],
+    examples: [
+      'Suggest B-roll for a 5-minute video about making the perfect cup of coffee. I want a cinematic, cozy vibe.',
+      'Give me a shot list for a tech review of a new laptop, focusing on its design and performance.'
+    ]
+  },
+  'default': {
+    tips: [
+      'Be as specific as possible about your desired outcome.',
+      'Provide context about your brand voice or target audience.',
+      'If you have a specific format in mind, describe it clearly.'
+    ],
+    examples: [
+      'Act as an expert copywriter and write a...',
+      'Create a list of 5 actionable tips about...'
+    ]
+  }
+};
 
 const TOOL_CATEGORIES = [
   {
@@ -73,11 +146,11 @@ const TOOL_CATEGORIES = [
   },
   {
     name: 'Writing & Editing',
-    tools: ['rewrite-humanizer', 'clean-paragraphs', 'script-improver', 'summarizer', 'dialogue-writer', 'email-writer', 'newsletter-writer', 'ad-copy']
+    tools: ['rewrite-humanizer', 'clean-paragraphs', 'script-improver', 'summarizer', 'dialogue-writer', 'email-writer', 'newsletter-writer', 'ad-copy', 'product-description', 'speech-writer']
   },
   {
     name: 'Strategy & Ideas',
-    tools: ['hook-generator', 'title-generator', 'story-ideas', 'outline-builder', 'seo-description', 'content-repurposer', 'objection-handler', 'interview-questions']
+    tools: ['hook-generator', 'title-generator', 'story-ideas', 'outline-builder', 'seo-description', 'content-repurposer', 'objection-handler', 'interview-questions', 'meme-ideas', 'course-outline']
   }
 ];
 
@@ -96,13 +169,17 @@ const IDEA_SUGGESTIONS = [
 const COLOR_THEMES = [
   { id: 'lavender', name: 'Lavender', color: 'bg-violet-500' },
   { id: 'mint', name: 'Mint', color: 'bg-emerald-500' },
-  { id: 'peach', name: 'Peach', color: 'bg-orange-500' },
+  { id: 'peach', name: 'Peach', color: 'bg-orange-400' },
   { id: 'rose', name: 'Rose', color: 'bg-rose-500' },
   { id: 'sky', name: 'Sky', color: 'bg-sky-500' },
-  { id: 'sunset', name: 'Sunset', color: 'bg-pink-500' },
-  { id: 'ocean', name: 'Ocean', color: 'bg-teal-500' },
-  { id: 'forest', name: 'Forest', color: 'bg-green-600' },
-  { id: 'berry', name: 'Berry', color: 'bg-fuchsia-600' },
+  { id: 'sunset', name: 'Sunset', color: 'bg-rose-400' },
+  { id: 'ocean', name: 'Ocean', color: 'bg-cyan-600' },
+  { id: 'forest', name: 'Forest', color: 'bg-green-700' },
+  { id: 'neon', name: 'Neon', color: 'bg-fuchsia-500' },
+  { id: 'cyber', name: 'Cyber', color: 'bg-sky-600' },
+  { id: 'minimal', name: 'Minimal', color: 'bg-slate-500' },
+  { id: 'midnight', name: 'Midnight', color: 'bg-indigo-400' },
+  { id: 'coffee', name: 'Coffee', color: 'bg-amber-700' },
 ];
 
 export default function App() {
@@ -131,6 +208,7 @@ export default function App() {
   const [activeTool, setActiveTool] = useState(ALL_TOOLS[0].id);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
   // Tool State
   const [inputData, setInputData] = useState<Record<string, any>>({});
@@ -407,6 +485,22 @@ export default function App() {
             if (!inputData.topic) throw new Error('Topic is required.');
             prompt = `Write a viral, engaging LinkedIn post about "${inputData.topic}". Use a strong hook, short readable paragraphs (broetry style but natural), and end with a question to drive comments.`;
             break;
+          case 'meme-ideas':
+            if (!inputData.topic) throw new Error('Topic is required.');
+            prompt = `Generate 5 viral meme concepts about "${inputData.topic}". Describe the image/template to use and the exact text for the caption. Make them highly relatable and funny.`;
+            break;
+          case 'product-description':
+            if (!inputData.topic) throw new Error('Product details are required.');
+            prompt = `Write a compelling, SEO-optimized product description for "${inputData.topic}". Highlight the benefits, features, and include a strong call to action.`;
+            break;
+          case 'course-outline':
+            if (!inputData.topic) throw new Error('Course topic is required.');
+            prompt = `Create a structured, comprehensive course outline for an online course about "${inputData.topic}". Include modules, lessons, and key takeaways for each section.`;
+            break;
+          case 'speech-writer':
+            if (!inputData.topic) throw new Error('Speech topic/context is required.');
+            prompt = `Write an inspiring, persuasive speech about "${inputData.topic}". Include a strong opening, emotional storytelling, clear main points, and a memorable conclusion.`;
+            break;
           default:
             const input = inputData.text || inputData.topic;
             if (!input) throw new Error('Input is required.');
@@ -486,6 +580,37 @@ export default function App() {
     a.click();
     URL.revokeObjectURL(url);
     toast.success('Downloaded successfully!');
+  };
+
+  const handleDownloadPDF = () => {
+    const textToDownload = isEditingOutput ? editedOutput : output;
+    if (!textToDownload) return;
+    
+    try {
+      const doc = new jsPDF();
+      const splitText = doc.splitTextToSize(textToDownload, 180);
+      let y = 20;
+      
+      doc.setFontSize(16);
+      doc.text(`Brilliantlabs AI - ${activeToolData?.name || 'Generated Content'}`, 15, y);
+      y += 10;
+      
+      doc.setFontSize(12);
+      for (let i = 0; i < splitText.length; i++) {
+        if (y > 280) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(splitText[i], 15, y);
+        y += 7;
+      }
+      
+      doc.save(`${activeTool}-output.pdf`);
+      toast.success('PDF downloaded successfully!');
+    } catch (error) {
+      console.error("PDF Generation Error:", error);
+      toast.error('Failed to generate PDF.');
+    }
   };
 
   const handleShare = async () => {
@@ -960,7 +1085,17 @@ export default function App() {
                     <motion.div layout className="space-y-6">
                       <motion.div layout>
                         <div className="flex items-center justify-between mb-2">
-                          <label className="block text-sm font-semibold text-foreground/80">Topic or Idea</label>
+                          <div className="flex items-center gap-2">
+                            <label className="block text-sm font-semibold text-foreground/80">Topic or Idea</label>
+                            <button
+                              type="button"
+                              onClick={() => setIsHelpModalOpen(true)}
+                              className="text-muted-foreground hover:text-primary transition-colors"
+                              title="Prompt Engineering Best Practices"
+                            >
+                              <HelpCircle size={16} />
+                            </button>
+                          </div>
                           <div className="flex items-center gap-2">
                             <button 
                               type="button"
@@ -1184,9 +1319,19 @@ export default function App() {
                   ) : (
                     <motion.div layout>
                       <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-semibold text-foreground/80">
-                          {activeTool.includes('rewrite') || activeTool.includes('improver') || activeTool.includes('summarizer') || activeTool.includes('clean') ? 'Text to process' : 'Topic or Idea'}
-                        </label>
+                        <div className="flex items-center gap-2">
+                          <label className="block text-sm font-semibold text-foreground/80">
+                            {activeTool.includes('rewrite') || activeTool.includes('improver') || activeTool.includes('summarizer') || activeTool.includes('clean') ? 'Text to process' : 'Topic or Idea'}
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setIsHelpModalOpen(true)}
+                            className="text-muted-foreground hover:text-primary transition-colors"
+                            title="Prompt Engineering Best Practices"
+                          >
+                            <HelpCircle size={16} />
+                          </button>
+                        </div>
                         <div className="flex items-center gap-2">
                           {(!activeTool.includes('rewrite') && !activeTool.includes('improver') && !activeTool.includes('summarizer') && !activeTool.includes('clean')) && (
                             <button 
@@ -1287,6 +1432,9 @@ export default function App() {
                         </button>
                         <button onClick={handleDownload} className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground" title="Download as .txt">
                           <Download size={18} />
+                        </button>
+                        <button onClick={handleDownloadPDF} className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground" title="Download as .pdf">
+                          <FileDown size={18} />
                         </button>
                         <button onClick={handleGenerate} className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground" title="Regenerate">
                           <RefreshCw size={18} />
@@ -1489,6 +1637,70 @@ export default function App() {
                     <Check size={18} /> Create Tool
                   </button>
                 </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Help Modal */}
+      <AnimatePresence>
+        {isHelpModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsHelpModalOpen(false)}
+              className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden z-10"
+            >
+              <div className="flex items-center justify-between p-6 border-b border-border/50 bg-muted/30">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                    <HelpCircle size={20} />
+                  </div>
+                  <h2 className="text-xl font-semibold">Prompt Engineering Best Practices</h2>
+                </div>
+                <button
+                  onClick={() => setIsHelpModalOpen(false)}
+                  className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
+                    <Sparkles size={18} className="text-primary" /> Tips for {activeToolData?.name}
+                  </h3>
+                  <ul className="space-y-3">
+                    {(PROMPT_BEST_PRACTICES[activeTool]?.tips || PROMPT_BEST_PRACTICES['default'].tips).map((tip, i) => (
+                      <li key={i} className="flex items-start gap-3 text-muted-foreground">
+                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary/50 shrink-0" />
+                        <span className="leading-relaxed">{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
+                    <Lightbulb size={18} className="text-amber-500" /> Examples
+                  </h3>
+                  <div className="space-y-3">
+                    {(PROMPT_BEST_PRACTICES[activeTool]?.examples || PROMPT_BEST_PRACTICES['default'].examples).map((example, i) => (
+                      <div key={i} className="p-4 rounded-xl bg-muted/50 border border-border/50 text-sm text-foreground/90 leading-relaxed">
+                        "{example}"
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </motion.div>
           </div>

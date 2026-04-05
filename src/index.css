@@ -64,6 +64,68 @@
     --accent-foreground: #0369a1;
   }
 
+  [data-theme="sunset"] {
+    --background: #fff5f5;
+    --primary: #f43f5e;
+    --accent: #ffe4e6;
+    --accent-foreground: #be123c;
+  }
+
+  [data-theme="ocean"] {
+    --background: #f0fdfa;
+    --primary: #0891b2;
+    --accent: #cffafe;
+    --accent-foreground: #164e63;
+  }
+
+  [data-theme="forest"] {
+    --background: #f0fdf4;
+    --primary: #15803d;
+    --accent: #dcfce7;
+    --accent-foreground: #166534;
+  }
+
+  [data-theme="neon"] {
+    --background: #fdf4ff;
+    --primary: #d946ef;
+    --accent: #fae8ff;
+    --accent-foreground: #a21caf;
+  }
+
+  [data-theme="cyber"] {
+    --background: #f8fafc;
+    --primary: #0284c7;
+    --accent: #e0f2fe;
+    --accent-foreground: #0369a1;
+  }
+
+  [data-theme="minimal"] {
+    --background: #ffffff;
+    --primary: #334155;
+    --accent: #f1f5f9;
+    --accent-foreground: #0f172a;
+  }
+
+  [data-theme="midnight"] {
+    --background: #0f172a;
+    --primary: #818cf8;
+    --accent: #1e293b;
+    --accent-foreground: #c7d2fe;
+    --foreground: #f8fafc;
+    --card: rgba(30, 41, 59, 0.7);
+    --border: rgba(255, 255, 255, 0.1);
+    --input: rgba(0, 0, 0, 0.3);
+    --muted: rgba(255, 255, 255, 0.05);
+    --muted-foreground: #94a3b8;
+  }
+
+  [data-theme="coffee"] {
+    --background: #fdf8f6;
+    --primary: #8b5a2b;
+    --accent: #f5e6d3;
+    --accent-foreground: #5c3a21;
+  }
+
   .dark {
     --background: #0b0f19;
     --foreground: #f8fafc;
@@ -80,6 +142,14 @@
   .dark[data-theme="peach"] { --primary: #fb923c; --accent: rgba(249, 115, 22, 0.15); }
   .dark[data-theme="rose"] { --primary: #fb7185; --accent: rgba(244, 63, 94, 0.15); }
   .dark[data-theme="sky"] { --primary: #38bdf8; --accent: rgba(14, 165, 233, 0.15); }
+  .dark[data-theme="sunset"] { --primary: #fb923c; --accent: rgba(249, 115, 22, 0.15); }
+  .dark[data-theme="ocean"] { --primary: #2dd4bf; --accent: rgba(45, 212, 191, 0.15); }
+  .dark[data-theme="forest"] { --primary: #4ade80; --accent: rgba(74, 222, 128, 0.15); }
+  .dark[data-theme="neon"] { --primary: #e879f9; --accent: rgba(232, 121, 249, 0.15); }
+  .dark[data-theme="cyber"] { --primary: #38bdf8; --accent: rgba(56, 189, 248, 0.15); }
+  .dark[data-theme="minimal"] { --primary: #94a3b8; --accent: rgba(148, 163, 184, 0.15); }
+  .dark[data-theme="midnight"] { --primary: #818cf8; --accent: rgba(129, 140, 248, 0.15); }
+  .dark[data-theme="coffee"] { --primary: #d97706; --accent: rgba(217, 119, 6, 0.15); }
 
   body {
     @apply bg-background text-foreground transition-colors duration-500;
